@@ -56,70 +56,12 @@ const KEY = "petis-data-v1";
 const today = () => new Date().toISOString().slice(0, 10);
 
 function seed(): PetisData {
-  const petId = crypto.randomUUID();
-  const t = today();
   return {
-    pets: [
-      {
-        id: petId,
-        name: "Max",
-        species: "Cachorro",
-        breed: "Golden Retriever",
-        birthDate: "2021-05-12",
-        notes: "Alérgico a dipirona. Ração hipoalergênica.",
-        weights: [
-          { date: "2024-01-10", kg: 28 },
-          { date: "2024-06-10", kg: 29.5 },
-          { date: "2025-01-10", kg: 30.2 },
-          { date: "2025-09-10", kg: 31 },
-        ],
-        photos: [],
-      },
-    ],
-    activePetId: petId,
-    tasks: [
-      { id: crypto.randomUUID(), petId, title: "Ração da manhã", date: t, completed: true },
-      { id: crypto.randomUUID(), petId, title: "Passeio matinal", date: t, completed: true },
-      { id: crypto.randomUUID(), petId, title: "Escovação dos dentes", date: t, completed: true },
-      { id: crypto.randomUUID(), petId, title: "Ração da noite", date: t, completed: false },
-      { id: crypto.randomUUID(), petId, title: "Vermífugo mensal", date: t, completed: false },
-    ],
-    appointments: [
-      {
-        id: crypto.randomUUID(),
-        petId,
-        type: "Banho/Tosa",
-        date: t,
-        time: "16:00",
-        notes: "Pet shop da esquina",
-        completed: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        petId,
-        type: "Consulta",
-        date: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
-        time: "10:30",
-        notes: "Check-up anual",
-        completed: false,
-      },
-    ],
-    vaccines: [
-      {
-        id: crypto.randomUUID(),
-        petId,
-        name: "V10 (Polivalente)",
-        appliedDate: "2024-08-15",
-        nextDate: "2025-08-15",
-      },
-      {
-        id: crypto.randomUUID(),
-        petId,
-        name: "Antirrábica",
-        appliedDate: "2024-09-20",
-        nextDate: new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10),
-      },
-    ],
+    pets: [],
+    activePetId: null,
+    tasks: [],
+    appointments: [],
+    vaccines: [],
   };
 }
 
