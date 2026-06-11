@@ -51,7 +51,7 @@ export type PetisData = {
   vaccines: Vaccine[];
 };
 
-const KEY = "petis-data-v1";
+const KEY = "petis-data-v2";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
