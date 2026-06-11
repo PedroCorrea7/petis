@@ -1,35 +1,102 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, Circle, Plus, Syringe, CalendarPlus, Scale, Sparkles } from "lucide-react";
+import {
+  CheckCircle2,
+  Circle,
+  Plus,
+  Syringe,
+  CalendarPlus,
+  Scale,
+  Sparkles,
+  PawPrint,
+  Clock,
+} from "lucide-react";
 import { toast } from "sonner";
 import { usePetis } from "@/lib/petis-storage";
 import { PetAvatar } from "./PetAvatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { TabKey } from "./BottomNav";
 
 export function Dashboard({
   onQuickAction,
+  onAddPet,
 }: {
   onQuickAction: (action: "vaccine" | "appointment" | "weight") => void;
   onNavigate?: (k: TabKey) => void;
+  onAddPet: () => void;
 }) {
-  const { data, activePet, toggleTask } = usePetis();
+  const { data, activePet, toggleTask, addTask } = usePetis();
   const [celebrate, setCelebrate] = useState<string | null>(null);
+  const [openReminder, setOpenReminder] = useState(false);
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todayTasks = useMemo(
-    () =>
-      data.tasks.filter(
-        (t) => t.petId === activePet?.id && t.date === todayStr,
-      ),
-    [data.tasks, activePet, todayStr],
-  );
-  const done = todayTasks.filter((t) => t.completed).length;
+
+  // Zero state — no pets at all
+  if (data.pets.length === 0) {
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center gap-5 p-6 pb-10 text-center">
+        <div className="grid h-24 w-24 place-items-center rounded-full bg-secondary text-5xl shadow-sm animate-pulse-soft">
+          🐾
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight">Bem-vindo ao Petis!</h1>
+          <p className="text-balance text-sm text-muted-foreground">
+            Para começar a acompanhar a rotina de saúde e bem-estar do seu amigo,
+            você precisa cadastrar o seu primeiro pet.
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={onAddPet}
+          className="min-h-12 w-full max-w-xs rounded-2xl text-base font-semibold shadow-md"
+        >
+          <PawPrint className="h-5 w-5" /> + Cadastrar Meu Pet
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Suas informações ficam salvas apenas neste dispositivo.
+        </p>
+      </div>
+    );
+  }
+
+  const todayTasks = useMemo(() => {
+    const items = data.tasks
+      .filter((t) => t.petId === activePet?.id)
+      .filter((t) => t.recurring === "daily" || t.date === todayStr)
+      .map((t) => ({
+        ...t,
+        completedToday:
+          t.recurring === "daily"
+            ? (t.completedDates ?? []).includes(todayStr)
+            : t.completed,
+      }))
+      .sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"));
+    return items;
+  }, [data.tasks, activePet, todayStr]);
+
+  const done = todayTasks.filter((t) => t.completedToday).length;
   const total = todayTasks.length;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   const handleToggle = (id: string, currentlyCompleted: boolean) => {
-    toggleTask(id);
+    toggleTask(id, todayStr);
     if (!currentlyCompleted) {
       setCelebrate(id);
       toast.success("Tarefa concluída!", { description: "Bom cuidado com seu pet 🐾" });
@@ -59,9 +126,11 @@ export function Dashboard({
               {done} de {total} cuidados
             </p>
             <p className="text-sm opacity-90">
-              {pct === 100 && total > 0
-                ? "Tudo em dia! ✨"
-                : "Continue cuidando bem do seu pet."}
+              {total === 0
+                ? "Adicione um lembrete para começar."
+                : pct === 100
+                  ? "Tudo em dia! ✨"
+                  : "Continue cuidando bem do seu pet."}
             </p>
           </div>
           <Sparkles className="h-8 w-8 shrink-0 opacity-80" aria-hidden />
@@ -107,12 +176,22 @@ export function Dashboard({
 
       {/* Today's reminders */}
       <section aria-labelledby="reminders-title">
-        <h2 id="reminders-title" className="mb-2 text-sm font-semibold text-muted-foreground">
-          Lembretes de hoje
-        </h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 id="reminders-title" className="text-sm font-semibold text-muted-foreground">
+            Lembretes de hoje
+          </h2>
+          <button
+            type="button"
+            onClick={() => setOpenReminder(true)}
+            className="inline-flex min-h-9 items-center gap-1 rounded-full bg-accent/15 px-3 text-xs font-semibold text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Adicionar novo lembrete"
+          >
+            <Plus className="h-3.5 w-3.5" /> Novo Lembrete
+          </button>
+        </div>
         {todayTasks.length === 0 ? (
           <Card className="rounded-2xl p-5 text-center text-sm text-muted-foreground">
-            Nenhum lembrete para hoje. Aproveite o dia! 🌿
+            Nenhum lembrete para hoje. Toque em <span className="font-semibold text-accent">+ Novo Lembrete</span> para adicionar.
           </Card>
         ) : (
           <ul className="space-y-2">
@@ -120,11 +199,11 @@ export function Dashboard({
               <li key={t.id}>
                 <button
                   type="button"
-                  onClick={() => handleToggle(t.id, t.completed)}
-                  aria-pressed={t.completed}
+                  onClick={() => handleToggle(t.id, t.completedToday)}
+                  aria-pressed={t.completedToday}
                   className={
                     "flex min-h-14 w-full items-center gap-3 rounded-2xl border bg-card p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-                    (t.completed
+                    (t.completedToday
                       ? "border-success/30 bg-success/5"
                       : "border-border hover:border-primary/40")
                   }
@@ -132,33 +211,51 @@ export function Dashboard({
                   <span
                     className={
                       "grid h-7 w-7 shrink-0 place-items-center rounded-full " +
-                      (t.completed ? "text-success" : "text-muted-foreground") +
+                      (t.completedToday ? "text-success" : "text-muted-foreground") +
                       (celebrate === t.id ? " animate-pop-check" : "")
                     }
                   >
-                    {t.completed ? (
+                    {t.completedToday ? (
                       <CheckCircle2 className="h-7 w-7" />
                     ) : (
                       <Circle className="h-7 w-7" />
                     )}
                   </span>
-                  <span
-                    className={
-                      "flex-1 text-base font-medium " +
-                      (t.completed ? "text-muted-foreground line-through" : "text-foreground")
-                    }
-                  >
-                    {t.title}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span
+                      className={
+                        "truncate text-base font-medium " +
+                        (t.completedToday
+                          ? "text-muted-foreground line-through"
+                          : "text-foreground")
+                      }
+                    >
+                      {t.title}
+                    </span>
+                    {(t.time || t.recurring === "daily") && (
+                      <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {t.time && (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> {t.time}
+                          </span>
+                        )}
+                        {t.recurring === "daily" && (
+                          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-foreground">
+                            Diário
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </span>
                   <span
                     className={
                       "rounded-full px-2 py-0.5 text-xs font-semibold " +
-                      (t.completed
+                      (t.completedToday
                         ? "bg-success/15 text-success"
                         : "bg-warning/20 text-warning-foreground")
                     }
                   >
-                    {t.completed ? "Concluído" : "Pendente"}
+                    {t.completedToday ? "Concluído" : "Pendente"}
                   </span>
                 </button>
               </li>
@@ -166,6 +263,25 @@ export function Dashboard({
           </ul>
         )}
       </section>
+
+      <ReminderDialog
+        open={openReminder}
+        onOpenChange={setOpenReminder}
+        onSubmit={({ title, time, recurring }) => {
+          if (!activePet) return;
+          addTask({
+            petId: activePet.id,
+            title,
+            date: todayStr,
+            time: time || undefined,
+            recurring,
+          });
+          toast.success("Lembrete adicionado!", {
+            description: recurring === "daily" ? "Vai se repetir todos os dias." : "Para hoje.",
+          });
+          setOpenReminder(false);
+        }}
+      />
     </div>
   );
 }
@@ -194,5 +310,108 @@ function QuickAction({
         {label}
       </span>
     </Button>
+  );
+}
+
+function ReminderDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSubmit: (v: { title: string; time: string; recurring: "once" | "daily" }) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [time, setTime] = useState("");
+  const [recurring, setRecurring] = useState<"once" | "daily">("once");
+  const [touched, setTouched] = useState(false);
+  const titleErr = !title.trim() ? "Informe o nome da atividade" : "";
+
+  const reset = () => {
+    setTitle("");
+    setTime("");
+    setRecurring("once");
+    setTouched(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) reset();
+      }}
+    >
+      <DialogContent className="rounded-3xl">
+        <DialogHeader>
+          <DialogTitle>Novo lembrete</DialogTitle>
+          <DialogDescription>
+            Adicione rapidamente um cuidado para a rotina do seu pet.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setTouched(true);
+            if (titleErr) return;
+            onSubmit({ title: title.trim(), time, recurring });
+          }}
+          className="space-y-3"
+          noValidate
+        >
+          <div className="space-y-1.5">
+            <Label htmlFor="r-title">Atividade</Label>
+            <Input
+              id="r-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex.: Dar ração, Passear"
+              className="min-h-11 rounded-xl"
+              aria-invalid={touched && !!titleErr}
+              autoFocus
+            />
+            {touched && titleErr && <p className="text-xs text-destructive">{titleErr}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="r-time">Horário</Label>
+              <Input
+                id="r-time"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="min-h-11 rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="r-rec">Repetição</Label>
+              <Select value={recurring} onValueChange={(v) => setRecurring(v as "once" | "daily")}>
+                <SelectTrigger id="r-rec" className="min-h-11 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">Apenas hoje</SelectItem>
+                  <SelectItem value="daily">Todos os dias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="min-h-11 rounded-xl"
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" className="min-h-11 rounded-xl">
+              Salvar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
