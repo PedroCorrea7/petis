@@ -163,18 +163,31 @@ export function usePetis() {
       [],
     ),
     toggleTask: useCallback(
-      (id: string) =>
+      (id: string, dateIso?: string) =>
         setData((d) => ({
           ...d,
-          tasks: d.tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)),
+          tasks: d.tasks.map((t) => {
+            if (t.id !== id) return t;
+            if (t.recurring === "daily") {
+              const day = dateIso ?? today();
+              const set = new Set(t.completedDates ?? []);
+              if (set.has(day)) set.delete(day);
+              else set.add(day);
+              return { ...t, completedDates: Array.from(set) };
+            }
+            return { ...t, completed: !t.completed };
+          }),
         })),
       [],
     ),
     addTask: useCallback(
-      (t: Omit<Task, "id" | "completed">) =>
+      (t: Omit<Task, "id" | "completed" | "completedDates">) =>
         setData((d) => ({
           ...d,
-          tasks: [...d.tasks, { ...t, id: crypto.randomUUID(), completed: false }],
+          tasks: [
+            ...d.tasks,
+            { ...t, id: crypto.randomUUID(), completed: false, completedDates: [] },
+          ],
         })),
       [],
     ),
