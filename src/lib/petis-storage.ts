@@ -16,8 +16,11 @@ export type Task = {
   id: string;
   petId: string;
   title: string;
-  date: string; // ISO date YYYY-MM-DD
+  date: string; // ISO date YYYY-MM-DD (creation/target date)
+  time?: string; // HH:mm optional
+  recurring: "once" | "daily";
   completed: boolean;
+  completedDates?: string[]; // used when recurring === "daily"
 };
 
 export type Appointment = {
