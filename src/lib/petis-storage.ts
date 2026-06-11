@@ -6,29 +6,30 @@ export type Pet = {
   species: string;
   breed: string;
   birthDate: string; // ISO
-  photo?: string; // data URL or emoji fallback
+  gender?: "Macho" | "Fêmea" | "";
+  photo?: string;
   notes?: string;
   weights: { date: string; kg: number }[];
-  photos: string[]; // data URLs
+  photos: string[];
 };
 
 export type Task = {
   id: string;
   petId: string;
   title: string;
-  date: string; // ISO date YYYY-MM-DD (creation/target date)
-  time?: string; // HH:mm optional
+  date: string;
+  time?: string;
   recurring: "once" | "daily";
   completed: boolean;
-  completedDates?: string[]; // used when recurring === "daily"
+  completedDates?: string[];
 };
 
 export type Appointment = {
   id: string;
   petId: string;
   type: "Banho/Tosa" | "Consulta" | "Vacina" | "Medicação" | "Passeio";
-  date: string; // ISO date
-  time: string; // HH:mm
+  date: string;
+  time: string;
   notes?: string;
   completed: boolean;
 };
@@ -37,10 +38,10 @@ export type Vaccine = {
   id: string;
   petId: string;
   name: string;
-  appliedDate: string; // ISO
-  nextDate?: string; // ISO
+  appliedDate: string;
+  nextDate?: string;
   fileName?: string;
-  fileData?: string; // data URL
+  fileData?: string;
 };
 
 export type PetisData = {
@@ -52,17 +53,12 @@ export type PetisData = {
 };
 
 const KEY = "petis-data-v2";
+const AUTH_KEY = "petis:auth";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 function seed(): PetisData {
-  return {
-    pets: [],
-    activePetId: null,
-    tasks: [],
-    appointments: [],
-    vaccines: [],
-  };
+  return { pets: [], activePetId: null, tasks: [], appointments: [], vaccines: [] };
 }
 
 function load(): PetisData {
@@ -102,6 +98,8 @@ export function usePetis() {
   useEffect(() => {
     const l = () => force((n) => n + 1);
     listeners.add(l);
+    // Trigger an initial re-render after mount to pick up real localStorage
+    force((n) => n + 1);
     return () => {
       listeners.delete(l);
     };
@@ -143,11 +141,23 @@ export function usePetis() {
       [],
     ),
     addWeight: useCallback(
-      (petId: string, kg: number) =>
+      (petId: string, kg: number, date?: string) =>
         setData((d) => ({
           ...d,
           pets: d.pets.map((p) =>
-            p.id === petId ? { ...p, weights: [...p.weights, { date: today(), kg }] } : p,
+            p.id === petId
+              ? { ...p, weights: [...p.weights, { date: date ?? today(), kg }] }
+              : p,
+          ),
+        })),
+      [],
+    ),
+    deleteWeight: useCallback(
+      (petId: string, idx: number) =>
+        setData((d) => ({
+          ...d,
+          pets: d.pets.map((p) =>
+            p.id === petId ? { ...p, weights: p.weights.filter((_, i) => i !== idx) } : p,
           ),
         })),
       [],
@@ -250,4 +260,78 @@ export function daysUntil(dateIso?: string): number | null {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - now.getTime()) / 86400000);
+}
+
+/* ============ Auth (local, mock) ============ */
+export type AuthUser = { name: string; email: string; password: string; loggedIn: boolean };
+
+const authListeners = new Set<() => void>();
+
+export function getAuth(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setAuth(u: AuthUser | null) {
+  if (typeof window === "undefined") return;
+  if (u) localStorage.setItem(AUTH_KEY, JSON.stringify(u));
+  else localStorage.removeItem(AUTH_KEY);
+  authListeners.forEach((l) => l());
+}
+
+export function useAuth() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  useEffect(() => {
+    setUser(getAuth());
+    const l = () => setUser(getAuth());
+    authListeners.add(l);
+    return () => {
+      authListeners.delete(l);
+    };
+  }, []);
+  return {
+    user,
+    register: (name: string, email: string, password: string) => {
+      const u: AuthUser = { name, email, password, loggedIn: true };
+      setAuth(u);
+    },
+    login: (email: string, password: string) => {
+      const existing = getAuth();
+      if (!existing || existing.email !== email || existing.password !== password) {
+        return false;
+      }
+      setAuth({ ...existing, loggedIn: true });
+      return true;
+    },
+    logout: () => {
+      const existing = getAuth();
+      if (existing) setAuth({ ...existing, loggedIn: false });
+    },
+  };
+}
+
+/* ============ Dark mode ============ */
+const THEME_KEY = "petis:theme";
+export function useDarkMode() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const stored = localStorage.getItem(THEME_KEY);
+    const isDark = stored === "dark";
+    setDark(isDark);
+    document.documentElement.classList.toggle("dark", isDark);
+  }, []);
+  const toggle = () => {
+    setDark((prev) => {
+      const next = !prev;
+      document.documentElement.classList.toggle("dark", next);
+      localStorage.setItem(THEME_KEY, next ? "dark" : "light");
+      return next;
+    });
+  };
+  return { dark, toggle };
 }
