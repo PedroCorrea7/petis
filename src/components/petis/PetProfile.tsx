@@ -385,7 +385,7 @@ function AddWeightDialog({
   );
 }
 
-function AddPetDialog({
+export function AddPetDialog({
   open,
   onOpenChange,
 }: {
