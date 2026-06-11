@@ -5,7 +5,8 @@ import { BottomNav, type TabKey } from "@/components/petis/BottomNav";
 import { Dashboard } from "@/components/petis/Dashboard";
 import { Agenda } from "@/components/petis/Agenda";
 import { Vaccines } from "@/components/petis/Vaccines";
-import { PetProfile } from "@/components/petis/PetProfile";
+import { PetProfile, AddPetDialog } from "@/components/petis/PetProfile";
+import { usePetis } from "@/lib/petis-storage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,12 +29,20 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { data } = usePetis();
+  const hasPet = data.pets.length > 0;
+
   const [tab, setTab] = useState<TabKey>("home");
   const [openAppointmentForm, setOpenAppointmentForm] = useState(false);
   const [openVaccineForm, setOpenVaccineForm] = useState(false);
   const [openWeightForm, setOpenWeightForm] = useState(false);
+  const [openAddPet, setOpenAddPet] = useState(false);
 
   const onQuickAction = (action: "vaccine" | "appointment" | "weight") => {
+    if (!hasPet) {
+      setOpenAddPet(true);
+      return;
+    }
     if (action === "vaccine") {
       setTab("vaccines");
       setTimeout(() => setOpenVaccineForm(true), 50);
@@ -52,18 +61,33 @@ function Index() {
       lang="pt-BR"
     >
       <div className="flex-1 overflow-y-auto">
-        {tab === "home" && <Dashboard onQuickAction={onQuickAction} onNavigate={setTab} />}
-        {tab === "agenda" && (
+        {tab === "home" && (
+          <Dashboard
+            onQuickAction={onQuickAction}
+            onNavigate={setTab}
+            onAddPet={() => setOpenAddPet(true)}
+          />
+        )}
+        {tab === "agenda" && hasPet && (
           <Agenda openForm={openAppointmentForm} setOpenForm={setOpenAppointmentForm} />
         )}
-        {tab === "vaccines" && (
+        {tab === "vaccines" && hasPet && (
           <Vaccines openForm={openVaccineForm} setOpenForm={setOpenVaccineForm} />
         )}
         {tab === "profile" && (
           <PetProfile openWeight={openWeightForm} setOpenWeight={setOpenWeightForm} />
         )}
       </div>
-      <BottomNav active={tab} onChange={setTab} />
+      <BottomNav
+        active={tab}
+        onChange={setTab}
+        hasPet={hasPet}
+        onLockedTabClick={() => {
+          setTab("home");
+          setOpenAddPet(true);
+        }}
+      />
+      <AddPetDialog open={openAddPet} onOpenChange={setOpenAddPet} />
       <Toaster position="top-center" richColors />
     </main>
   );
