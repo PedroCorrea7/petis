@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PetFormDialog } from "./PetFormDialog";
 import { ShareMedicalDialog } from "./ShareMedicalDialog";
+import { PhotoLightbox } from "./PhotoLightbox";
 
 export function PetProfile({
   openWeight,
@@ -44,6 +45,7 @@ export function PetProfile({
   const [openSwitcher, setOpenSwitcher] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [pendingWeightDelete, setPendingWeightDelete] = useState<number | null>(null);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   if (!activePet) {
     return (
@@ -236,16 +238,30 @@ export function PetProfile({
         ) : (
           <div className="grid grid-cols-3 gap-2">
             {activePet.photos.map((p, i) => (
-              <div key={i} className="aspect-square overflow-hidden rounded-xl bg-muted">
+              <button
+                type="button"
+                key={i}
+                onClick={() => setLightboxIdx(i)}
+                aria-label={`Abrir foto ${i + 1} em tela cheia`}
+                className="group aspect-square overflow-hidden rounded-xl bg-muted transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+              >
                 <img
                   src={p}
                   alt={`Foto ${i + 1} de ${activePet.name}`}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
-              </div>
+              </button>
             ))}
           </div>
         )}
+        <PhotoLightbox
+          photos={activePet.photos}
+          index={lightboxIdx}
+          onChange={setLightboxIdx}
+          onClose={() => setLightboxIdx(null)}
+          alt={activePet.name}
+        />
+      </Card>
       </Card>
 
       <Button

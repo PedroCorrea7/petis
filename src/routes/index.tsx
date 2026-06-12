@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
+import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav, type TabKey } from "@/components/petis/BottomNav";
 import { Dashboard } from "@/components/petis/Dashboard";
@@ -11,6 +12,8 @@ import { PetFormDialog } from "@/components/petis/PetFormDialog";
 import { AuthGate } from "@/components/petis/AuthGate";
 import { DarkModeToggle } from "@/components/petis/DarkModeToggle";
 import { PetisLogo } from "@/components/petis/PetisLogo";
+import { SettingsSidebar } from "@/components/petis/SettingsSidebar";
+import { ConfirmDialog } from "@/components/petis/ConfirmDialog";
 import { usePetis, useAuth } from "@/lib/petis-storage";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -67,6 +70,8 @@ function AppShell() {
   const [openVaccineForm, setOpenVaccineForm] = useState(false);
   const [openWeightForm, setOpenWeightForm] = useState(false);
   const [openAddPet, setOpenAddPet] = useState(false);
+  const [openSidebar, setOpenSidebar] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const changeTab = (k: TabKey) => {
     if (k === tab) return;
@@ -97,20 +102,28 @@ function AppShell() {
       className="mx-auto flex min-h-dvh max-w-md flex-col bg-background shadow-2xl sm:my-4 sm:min-h-[calc(100dvh-2rem)] sm:rounded-[2rem] sm:overflow-hidden"
       lang="pt-BR"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-card/60 px-4 py-2">
-        <div className="flex items-center gap-2">
-          <PetisLogo size={28} />
-          <span className="text-sm font-semibold tracking-tight">
-            Petis{user?.name ? ` · ${user.name.split(" ")[0]}` : ""}
-          </span>
+      <div className="flex items-center justify-between gap-2 border-b border-border bg-card/60 px-3 py-2">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setOpenSidebar(true)}
+            aria-label="Abrir menu de configurações"
+            className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2 pl-1">
+            <PetisLogo size={26} />
+            <span className="text-sm font-semibold tracking-tight">
+              Petis{user?.name ? ` · ${user.name.split(" ")[0]}` : ""}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           <DarkModeToggle />
           <button
             type="button"
-            onClick={() => {
-              logout();
-            }}
+            onClick={() => setConfirmLogout(true)}
             aria-label="Sair"
             className="grid h-11 w-11 place-items-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -153,6 +166,24 @@ function AppShell() {
         }}
       />
       <PetFormDialog open={openAddPet} onOpenChange={setOpenAddPet} mode="create" />
+      <SettingsSidebar
+        open={openSidebar}
+        onOpenChange={setOpenSidebar}
+        onRequestLogout={() => setConfirmLogout(true)}
+      />
+      <ConfirmDialog
+        open={confirmLogout}
+        onOpenChange={setConfirmLogout}
+        title="Deseja mesmo sair do aplicativo?"
+        description="Você precisará inserir suas credenciais novamente para acessar os dados do seu pet."
+        confirmLabel="Sim, Sair"
+        destructive
+        onConfirm={() => {
+          logout();
+          setConfirmLogout(false);
+          toast.success("Sessão encerrada.");
+        }}
+      />
       <Toaster position="top-center" richColors />
     </main>
   );
