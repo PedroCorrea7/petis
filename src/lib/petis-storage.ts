@@ -53,7 +53,8 @@ export type PetisData = {
 };
 
 const KEY = "petis-data-v2";
-const AUTH_KEY = "petis:auth";
+const USERS_KEY = "petis:registered_users";
+const SESSION_KEY = "petis:session";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -98,7 +99,6 @@ export function usePetis() {
   useEffect(() => {
     const l = () => force((n) => n + 1);
     listeners.add(l);
-    // Trigger an initial re-render after mount to pick up real localStorage
     force((n) => n + 1);
     return () => {
       listeners.delete(l);
@@ -262,57 +262,114 @@ export function daysUntil(dateIso?: string): number | null {
   return Math.round((target.getTime() - now.getTime()) / 86400000);
 }
 
-/* ============ Auth (local, mock) ============ */
-export type AuthUser = { name: string; email: string; password: string; loggedIn: boolean };
+/* ============ Auth (local, multi-user mock) ============ */
+export type AuthUser = {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  photo?: string;
+};
+
+export type LoginResult =
+  | { ok: true }
+  | { ok: false; reason: "no-email" | "wrong-password" };
+
+export type RegisterResult = { ok: true } | { ok: false; reason: "exists" };
 
 const authListeners = new Set<() => void>();
 
-export function getAuth(): AuthUser | null {
+function readUsers(): AuthUser[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(USERS_KEY) ?? "[]") as AuthUser[];
+  } catch {
+    return [];
+  }
+}
+function writeUsers(u: AuthUser[]) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(u));
+}
+function readSession(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
   } catch {
     return null;
   }
 }
-
-function setAuth(u: AuthUser | null) {
-  if (typeof window === "undefined") return;
-  if (u) localStorage.setItem(AUTH_KEY, JSON.stringify(u));
-  else localStorage.removeItem(AUTH_KEY);
+function writeSession(email: string | null) {
+  if (email) localStorage.setItem(SESSION_KEY, JSON.stringify(email));
+  else localStorage.removeItem(SESSION_KEY);
   authListeners.forEach((l) => l());
+}
+
+export function getAuth(): AuthUser | null {
+  const email = readSession();
+  if (!email) return null;
+  return readUsers().find((u) => u.email.toLowerCase() === email.toLowerCase()) ?? null;
+}
+
+export function hasRegisteredUsers(): boolean {
+  return readUsers().length > 0;
 }
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   useEffect(() => {
-    setUser(getAuth());
-    const l = () => setUser(getAuth());
-    authListeners.add(l);
+    const sync = () => setUser(getAuth());
+    sync();
+    authListeners.add(sync);
     return () => {
-      authListeners.delete(l);
+      authListeners.delete(sync);
     };
   }, []);
   return {
     user,
-    register: (name: string, email: string, password: string) => {
-      const u: AuthUser = { name, email, password, loggedIn: true };
-      setAuth(u);
-    },
-    login: (email: string, password: string) => {
-      const existing = getAuth();
-      if (!existing || existing.email !== email || existing.password !== password) {
-        return false;
+    register(data: AuthUser): RegisterResult {
+      const users = readUsers();
+      if (users.some((u) => u.email.toLowerCase() === data.email.toLowerCase())) {
+        return { ok: false, reason: "exists" };
       }
-      setAuth({ ...existing, loggedIn: true });
-      return true;
+      writeUsers([...users, data]);
+      writeSession(data.email);
+      return { ok: true };
     },
-    logout: () => {
-      const existing = getAuth();
-      if (existing) setAuth({ ...existing, loggedIn: false });
+    login(email: string, password: string): LoginResult {
+      const users = readUsers();
+      const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+      if (!found) return { ok: false, reason: "no-email" };
+      if (found.password !== password) return { ok: false, reason: "wrong-password" };
+      writeSession(found.email);
+      return { ok: true };
+    },
+    logout() {
+      writeSession(null);
+    },
+    updateUser(patch: Partial<AuthUser>) {
+      const currentEmail = readSession();
+      if (!currentEmail) return;
+      const users = readUsers().map((u) =>
+        u.email.toLowerCase() === currentEmail.toLowerCase() ? { ...u, ...patch } : u,
+      );
+      writeUsers(users);
+      if (patch.email && patch.email.toLowerCase() !== currentEmail.toLowerCase()) {
+        writeSession(patch.email);
+      } else {
+        authListeners.forEach((l) => l());
+      }
     },
   };
+}
+
+/* ============ Phone mask ============ */
+export function maskPhone(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
 /* ============ Dark mode ============ */
