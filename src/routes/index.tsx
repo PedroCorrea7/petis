@@ -16,21 +16,20 @@ import { SettingsSidebar } from "@/components/petis/SettingsSidebar";
 import { ConfirmDialog } from "@/components/petis/ConfirmDialog";
 import { usePetis, useAuth } from "@/lib/petis-storage";
 import { Skeleton } from "@/components/ui/skeleton";
+import { t } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Petis — Rotina e saúde do seu pet" },
+      { title: t("app.title.long") },
       {
         name: "description",
-        content:
-          "Gerencie a rotina, agenda, vacinas e bem-estar do seu pet em um único lugar.",
+        content: t("app.description.long"),
       },
-      { property: "og:title", content: "Petis — Rotina e saúde do seu pet" },
+      { property: "og:title", content: t("app.title.long") },
       {
         property: "og:description",
-        content:
-          "Gerencie a rotina, agenda, vacinas e bem-estar do seu pet em um único lugar.",
+        content: t("app.description.long"),
       },
     ],
   }),
@@ -46,7 +45,7 @@ function Index() {
       <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <PetisLogo size={64} />
-          <p className="text-sm text-muted-foreground">Carregando Petis...</p>
+          <p className="text-sm text-muted-foreground">{t("loading")}</p>
         </div>
       </main>
     );
@@ -107,7 +106,7 @@ function AppShell() {
           <button
             type="button"
             onClick={() => setOpenSidebar(true)}
-            aria-label="Abrir menu de configurações"
+            aria-label={t("open.settings.menu.label")}
             className="grid h-11 w-11 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Menu className="h-5 w-5" />
@@ -124,7 +123,7 @@ function AppShell() {
           <button
             type="button"
             onClick={() => setConfirmLogout(true)}
-            aria-label="Sair"
+            aria-label={t("logout.label")}
             className="grid h-11 w-11 place-items-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <LogOut className="h-5 w-5" />
@@ -174,14 +173,14 @@ function AppShell() {
       <ConfirmDialog
         open={confirmLogout}
         onOpenChange={setConfirmLogout}
-        title="Deseja mesmo sair do aplicativo?"
-        description="Você precisará inserir suas credenciais novamente para acessar os dados do seu pet."
-        confirmLabel="Sim, Sair"
+        title={t("confirm.logout.title")}
+        description={t("confirm.logout.description")}
+        confirmLabel={t("confirm.logout.label")}
         destructive
         onConfirm={() => {
           logout();
           setConfirmLogout(false);
-          toast.success("Sessão encerrada.");
+          toast.success(t("logout.success.message"));
         }}
       />
       <Toaster position="top-center" richColors />

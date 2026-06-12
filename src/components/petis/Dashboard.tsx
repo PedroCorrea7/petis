@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TabKey } from "./BottomNav";
+import { t, useLanguage } from "@/lib/i18n";
 
 export function Dashboard({
   onQuickAction,
@@ -42,6 +44,7 @@ export function Dashboard({
   onNavigate?: (k: TabKey) => void;
   onAddPet: () => void;
 }) {
+  useLanguage(); // Ensure component re-renders when language changes
   const { data, activePet, toggleTask, addTask } = usePetis();
   const [celebrate, setCelebrate] = useState<string | null>(null);
   const [openReminder, setOpenReminder] = useState(false);
@@ -56,10 +59,9 @@ export function Dashboard({
           🐾
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">Bem-vindo ao Petis!</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("welcome.to.petis")}</h1>
           <p className="text-balance text-sm text-muted-foreground">
-            Para começar a acompanhar a rotina de saúde e bem-estar do seu amigo,
-            você precisa cadastrar o seu primeiro pet.
+            {t("welcome.start")}
           </p>
         </div>
         <Button
@@ -67,10 +69,10 @@ export function Dashboard({
           onClick={onAddPet}
           className="min-h-12 w-full max-w-xs rounded-2xl text-base font-semibold shadow-md"
         >
-          <PawPrint className="h-5 w-5" /> + Cadastrar Meu Pet
+          <PawPrint className="h-5 w-5" /> + {t("add.pet")}
         </Button>
         <p className="text-xs text-muted-foreground">
-          Suas informações ficam salvas apenas neste dispositivo.
+          {t("local.storage.notice")}
         </p>
       </div>
     );
@@ -110,9 +112,9 @@ export function Dashboard({
       <header className="flex items-center gap-3">
         <PetAvatar pet={activePet} size={56} />
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-muted-foreground">Olá, tutor</p>
+          <p className="text-sm text-muted-foreground">{t("hello.owner")}</p>
           <h1 className="truncate text-xl font-bold tracking-tight">
-            {activePet ? `do ${activePet.name}! 🐾` : "do seu pet! 🐾"}
+            {activePet ? `${activePet.name}! 🐾` : "do seu pet! 🐾"}
           </h1>
         </div>
       </header>
@@ -121,16 +123,16 @@ export function Dashboard({
       <Card className="rounded-3xl border-0 bg-gradient-to-br from-primary to-primary/80 p-5 text-primary-foreground shadow-md">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm opacity-90">Resumo do dia</p>
+            <p className="text-sm opacity-90">{t("daily.summary")}</p>
             <p className="mt-1 text-2xl font-bold">
-              {done} de {total} cuidados
+              {t("care.summary", done, total)}
             </p>
             <p className="text-sm opacity-90">
               {total === 0
-                ? "Adicione um lembrete para começar."
+                ? t("add.reminder.to.start")
                 : pct === 100
-                  ? "Tudo em dia! ✨"
-                  : "Continue cuidando bem do seu pet."}
+                  ? t("all.good")
+                  : t("keep.it.up")}
             </p>
           </div>
           <Sparkles className="h-8 w-8 shrink-0 opacity-80" aria-hidden />
@@ -153,21 +155,21 @@ export function Dashboard({
       {/* Quick actions */}
       <section aria-labelledby="quick-actions-title">
         <h2 id="quick-actions-title" className="mb-2 text-sm font-semibold text-muted-foreground">
-          Ações rápidas
+          {t("quick.actions")}
         </h2>
         <div className="grid grid-cols-3 gap-3">
           <QuickAction
-            label="Vacina"
+            label={t("vaccine")}
             icon={<Syringe className="h-5 w-5" />}
             onClick={() => onQuickAction("vaccine")}
           />
           <QuickAction
-            label="Compromisso"
+            label={t("appointment")}
             icon={<CalendarPlus className="h-5 w-5" />}
             onClick={() => onQuickAction("appointment")}
           />
           <QuickAction
-            label="Peso"
+            label={t("weight")}
             icon={<Scale className="h-5 w-5" />}
             onClick={() => onQuickAction("weight")}
           />
@@ -178,7 +180,7 @@ export function Dashboard({
       <section aria-labelledby="reminders-title">
         <div className="mb-2 flex items-center justify-between">
           <h2 id="reminders-title" className="text-sm font-semibold text-muted-foreground">
-            Lembretes de hoje
+            {t("todays.reminders")}
           </h2>
           <button
             type="button"
@@ -186,12 +188,15 @@ export function Dashboard({
             className="inline-flex min-h-9 items-center gap-1 rounded-full bg-accent/15 px-3 text-xs font-semibold text-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Adicionar novo lembrete"
           >
-            <Plus className="h-3.5 w-3.5" /> Novo Lembrete
+            <Plus className="h-3.5 w-3.5" /> {t("new.reminder")}
           </button>
         </div>
         {todayTasks.length === 0 ? (
           <Card className="rounded-2xl p-5 text-center text-sm text-muted-foreground">
-            Nenhum lembrete para hoje. Toque em <span className="font-semibold text-accent">+ Novo Lembrete</span> para adicionar.
+            {t("no.reminders.today")}{" "}
+            <span className="font-semibold text-accent">
+              {t("add.new.reminder.prompt")}
+            </span>
           </Card>
         ) : (
           <ul className="space-y-2">
@@ -345,9 +350,9 @@ function ReminderDialog({
     >
       <DialogContent className="rounded-3xl">
         <DialogHeader>
-          <DialogTitle>Novo lembrete</DialogTitle>
+          <DialogTitle>{t("new.reminder.dialog.title")}</DialogTitle>
           <DialogDescription>
-            Adicione rapidamente um cuidado para a rotina do seu pet.
+            {t("new.reminder.dialog.description")}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -361,12 +366,12 @@ function ReminderDialog({
           noValidate
         >
           <div className="space-y-1.5">
-            <Label htmlFor="r-title">Atividade</Label>
+            <Label htmlFor="r-title">{t("activity.label")}</Label>
             <Input
               id="r-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex.: Dar ração, Passear"
+              placeholder={t("activity.placeholder")}
               className="min-h-11 rounded-xl"
               aria-invalid={touched && !!titleErr}
               autoFocus
@@ -375,7 +380,7 @@ function ReminderDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="r-time">Horário</Label>
+              <Label htmlFor="r-time">{t("time.label")}</Label>
               <Input
                 id="r-time"
                 type="time"
@@ -385,14 +390,14 @@ function ReminderDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="r-rec">Repetição</Label>
+              <Label htmlFor="r-rec">{t("repetition.label")}</Label>
               <Select value={recurring} onValueChange={(v) => setRecurring(v as "once" | "daily")}>
                 <SelectTrigger id="r-rec" className="min-h-11 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="once">Apenas hoje</SelectItem>
-                  <SelectItem value="daily">Todos os dias</SelectItem>
+                  <SelectItem value="once">{t("repetition.once")}</SelectItem>
+                  <SelectItem value="daily">{t("repetition.daily")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -404,10 +409,10 @@ function ReminderDialog({
               onClick={() => onOpenChange(false)}
               className="min-h-11 rounded-xl"
             >
-              Cancelar
+              {t("cancel")}
             </Button>
             <Button type="submit" className="min-h-11 rounded-xl">
-              Salvar
+              {t("save")}
             </Button>
           </DialogFooter>
         </form>
