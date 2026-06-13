@@ -51,6 +51,22 @@ export function Dashboard({
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  const todayTasks = useMemo(() => {
+    if (!activePet) return [];
+    const items = data.tasks
+      .filter((t) => t.petId === activePet.id)
+      .filter((t) => t.recurring === "daily" || t.date === todayStr)
+      .map((t) => ({
+        ...t,
+        completedToday:
+          t.recurring === "daily"
+            ? (t.completedDates ?? []).includes(todayStr)
+            : t.completed,
+      }))
+      .sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"));
+    return items;
+  }, [data.tasks, activePet, todayStr]);
+
   // Zero state — no pets at all
   if (data.pets.length === 0) {
     return (
@@ -77,21 +93,6 @@ export function Dashboard({
       </div>
     );
   }
-
-  const todayTasks = useMemo(() => {
-    const items = data.tasks
-      .filter((t) => t.petId === activePet?.id)
-      .filter((t) => t.recurring === "daily" || t.date === todayStr)
-      .map((t) => ({
-        ...t,
-        completedToday:
-          t.recurring === "daily"
-            ? (t.completedDates ?? []).includes(todayStr)
-            : t.completed,
-      }))
-      .sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"));
-    return items;
-  }, [data.tasks, activePet, todayStr]);
 
   const done = todayTasks.filter((t) => t.completedToday).length;
   const total = todayTasks.length;

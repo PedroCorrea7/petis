@@ -47,6 +47,14 @@ export function PetProfile({
   const [pendingWeightDelete, setPendingWeightDelete] = useState<number | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
+  const sortedWeights = useMemo(() => {
+    if (!activePet) return [];
+    return [...activePet.weights].sort((a, b) => a.date.localeCompare(b.date));
+  }, [activePet?.weights]);
+  const latest = sortedWeights.at(-1)?.kg ?? null;
+  const maxW = Math.max(...sortedWeights.map((w) => w.kg), 1);
+  const minW = Math.min(...sortedWeights.map((w) => w.kg), 0);
+
   if (!activePet) {
     return (
       <div className="space-y-4 p-5">
@@ -61,14 +69,6 @@ export function PetProfile({
       </div>
     );
   }
-
-  const sortedWeights = useMemo(
-    () => [...activePet.weights].sort((a, b) => a.date.localeCompare(b.date)),
-    [activePet.weights],
-  );
-  const latest = sortedWeights.at(-1)?.kg ?? null;
-  const maxW = Math.max(...sortedWeights.map((w) => w.kg), 1);
-  const minW = Math.min(...sortedWeights.map((w) => w.kg), 0);
 
   return (
     <div className="space-y-5 p-5 pb-6">
