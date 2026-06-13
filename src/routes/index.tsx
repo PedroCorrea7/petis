@@ -59,9 +59,10 @@ function Index() {
 }
 
 function AppShell() {
+  useLanguage(); // re-render entire shell when language changes
   const { data } = usePetis();
   const { user, logout } = useAuth();
-  const hasPet = data.pets.length > 0;
+  const hasPet = (data?.pets?.length ?? 0) > 0;
 
   const [tab, setTab] = useState<TabKey>("home");
   const [transitioning, setTransitioning] = useState(false);
