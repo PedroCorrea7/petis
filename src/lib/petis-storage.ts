@@ -5,13 +5,13 @@ export type Pet = {
   name: string;
   species: string;
   breed: string;
-  birthDate: string; // ISO
+  birthDate: string;
   gender?: "Macho" | "Fêmea" | "";
   photo?: string;
   notes?: string;
   weights: { date: string; kg: number }[];
   photos: string[];
-  owner: string; // <-- 1. Vinculação Relacional
+  owner: string;
 };
 
 export type Task = {
@@ -53,91 +53,132 @@ export type PetisData = {
   vaccines: Vaccine[];
 };
 
-// CHAVES DO LOCALSTORAGE
-const DATA_KEY_PREFIX = "petis-data-v2";
-const USERS_KEY = "petis:registered_users";
-const SESSION_KEY = "petis:session";
+/* ============ Storage keys (per user, prefixed by email) ============ */
+const AUTH_KEY = "petis:auth"; // currently logged user object
+const USERS_KEY = "petis:users"; // all registered users with credentials
 
-// FUNÇÕES AUXILIARES
+const petsKey = (email: string) => `petis:pets:${email}`;
+const tasksKey = (email: string) => `petis:tasks:${email}`;
+const apptsKey = (email: string) => `petis:appointments:${email}`;
+const vaccinesKey = (email: string) => `petis:vaccines:${email}`;
+const activePetKey = (email: string) => `petis:activePet:${email}`;
+
 const today = () => new Date().toISOString().slice(0, 10);
-const getDataKey = (email: string) => `${DATA_KEY_PREFIX}_${email}`;
 
-// Estado inicial para um novo usuário
-function seed(): PetisData {
-  return { pets: [], activePetId: null, tasks: [], appointments: [], vaccines: [] };
-}
-
-// Carrega os dados do usuário especificado
-function loadDataForUser(email: string): PetisData {
-  if (typeof window === "undefined") return seed();
+/* ============ Auth session helpers ============ */
+function readAuth(): AuthUser | null {
+  if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(getDataKey(email));
-    if (!raw) return seed(); // Se não há dados, retorna o estado inicial
-    return JSON.parse(raw) as PetisData;
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
-    return seed();
+    return null;
   }
 }
-
-// CACHE EM MEMÓRIA E LISTENERS
-let memory: PetisData | null = null;
-const listeners = new Set<() => void>();
-
-// Obtém os dados do usuário logado
-function getData(): PetisData {
-  if (memory) return memory;
-  const userEmail = readSession();
-  if (userEmail) {
-    memory = loadDataForUser(userEmail);
-  } else {
-    memory = seed(); // Se não há sessão, retorna dados vazios
-  }
-  return memory;
+function writeAuth(user: AuthUser | null) {
+  if (typeof window === "undefined") return;
+  if (user) localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+  else localStorage.removeItem(AUTH_KEY);
 }
 
-// Atualiza os dados do usuário logado
-function setData(updater: (d: PetisData) => PetisData) {
-  const userEmail = readSession();
-  if (!userEmail) return; // Não faz nada se não houver usuário logado
+function getLoggedEmail(): string | null {
+  return readAuth()?.email ?? null;
+}
 
-  const next = updater(getData());
-  memory = next;
+/* ============ Per-user data load / save (no global cache) ============ */
+function safeParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
   try {
-    localStorage.setItem(getDataKey(userEmail), JSON.stringify(next));
-  } catch {}
-  listeners.forEach((l) => l());
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
 }
 
-// HOOK DE DADOS PRINCIPAL
+function loadData(email: string): PetisData {
+  if (typeof window === "undefined") {
+    return { pets: [], activePetId: null, tasks: [], appointments: [], vaccines: [] };
+  }
+  return {
+    pets: safeParse<Pet[]>(localStorage.getItem(petsKey(email)), []),
+    tasks: safeParse<Task[]>(localStorage.getItem(tasksKey(email)), []),
+    appointments: safeParse<Appointment[]>(localStorage.getItem(apptsKey(email)), []),
+    vaccines: safeParse<Vaccine[]>(localStorage.getItem(vaccinesKey(email)), []),
+    activePetId: safeParse<string | null>(localStorage.getItem(activePetKey(email)), null),
+  };
+}
+
+function saveData(email: string, data: PetisData) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(petsKey(email), JSON.stringify(data.pets));
+  localStorage.setItem(tasksKey(email), JSON.stringify(data.tasks));
+  localStorage.setItem(apptsKey(email), JSON.stringify(data.appointments));
+  localStorage.setItem(vaccinesKey(email), JSON.stringify(data.vaccines));
+  localStorage.setItem(activePetKey(email), JSON.stringify(data.activePetId));
+}
+
+const dataListeners = new Set<() => void>();
+const authListeners = new Set<() => void>();
+
+function notifyData() {
+  dataListeners.forEach((l) => l());
+}
+function notifyAuth() {
+  authListeners.forEach((l) => l());
+  notifyData(); // data is scoped to auth, refresh consumers too
+}
+
+function mutate(updater: (d: PetisData) => PetisData) {
+  const email = getLoggedEmail();
+  if (!email) return;
+  const next = updater(loadData(email));
+  saveData(email, next);
+  notifyData();
+}
+
+/* ============ usePetis hook ============ */
 export function usePetis() {
-  const auth = useAuth(); // Dependência do estado de autenticação
+  const auth = useAuth();
   const [, force] = useState(0);
 
   useEffect(() => {
     const l = () => force((n) => n + 1);
-    listeners.add(l);
-    // Força a atualização quando o usuário muda
-    force((n) => n + 1); 
+    dataListeners.add(l);
     return () => {
-      listeners.delete(l);
+      dataListeners.delete(l);
     };
-  }, [auth.user]); // Re-executa se o usuário mudar
+  }, []);
 
-  const data = getData();
+  // Force re-derive when user changes
+  useEffect(() => {
+    force((n) => n + 1);
+  }, [auth.user?.email]);
+
+  const email = auth.user?.email ?? null;
+  const data: PetisData = email
+    ? loadData(email)
+    : { pets: [], activePetId: null, tasks: [], appointments: [], vaccines: [] };
   const activePet = data.pets.find((p) => p.id === data.activePetId) ?? data.pets[0] ?? null;
 
   return {
     data,
     activePet,
-    setActivePet: useCallback((id: string) => setData((d) => ({ ...d, activePetId: id })), []),
+    setActivePet: useCallback(
+      (id: string) => mutate((d) => ({ ...d, activePetId: id })),
+      [],
+    ),
     addPet: useCallback(
       (pet: Omit<Pet, "id" | "weights" | "photos" | "owner">) => {
-        const userEmail = readSession();
-        if (!userEmail) return; // Segurança extra
-
-        setData((d) => {
-          // Injeta o 'owner' na criação do Pet
-          const newPet: Pet = { ...pet, id: crypto.randomUUID(), weights: [], photos: [], owner: userEmail };
+        const ownerEmail = getLoggedEmail();
+        if (!ownerEmail) return;
+        mutate((d) => {
+          const newPet: Pet = {
+            ...pet,
+            id: crypto.randomUUID(),
+            weights: [],
+            photos: [],
+            owner: ownerEmail,
+          };
           return { ...d, pets: [...d.pets, newPet], activePetId: newPet.id };
         });
       },
@@ -145,12 +186,15 @@ export function usePetis() {
     ),
     updatePet: useCallback(
       (id: string, patch: Partial<Pet>) =>
-        setData((d) => ({ ...d, pets: d.pets.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
+        mutate((d) => ({
+          ...d,
+          pets: d.pets.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        })),
       [],
     ),
     deletePet: useCallback(
       (id: string) =>
-        setData((d) => {
+        mutate((d) => {
           const pets = d.pets.filter((p) => p.id !== id);
           return {
             ...d,
@@ -163,9 +207,9 @@ export function usePetis() {
         }),
       [],
     ),
-     addWeight: useCallback(
+    addWeight: useCallback(
       (petId: string, kg: number, date?: string) =>
-        setData((d) => ({
+        mutate((d) => ({
           ...d,
           pets: d.pets.map((p) =>
             p.id === petId
@@ -177,7 +221,7 @@ export function usePetis() {
     ),
     deleteWeight: useCallback(
       (petId: string, idx: number) =>
-        setData((d) => ({
+        mutate((d) => ({
           ...d,
           pets: d.pets.map((p) =>
             p.id === petId ? { ...p, weights: p.weights.filter((_, i) => i !== idx) } : p,
@@ -187,7 +231,7 @@ export function usePetis() {
     ),
     addPhoto: useCallback(
       (petId: string, dataUrl: string) =>
-        setData((d) => ({
+        mutate((d) => ({
           ...d,
           pets: d.pets.map((p) =>
             p.id === petId ? { ...p, photos: [dataUrl, ...p.photos] } : p,
@@ -197,7 +241,7 @@ export function usePetis() {
     ),
     toggleTask: useCallback(
       (id: string, dateIso?: string) =>
-        setData((d) => ({
+        mutate((d) => ({
           ...d,
           tasks: d.tasks.map((t) => {
             if (t.id !== id) return t;
@@ -215,7 +259,7 @@ export function usePetis() {
     ),
     addTask: useCallback(
       (t: Omit<Task, "id" | "completed" | "completedDates">) =>
-        setData((d) => ({
+        mutate((d) => ({
           ...d,
           tasks: [
             ...d.tasks,
@@ -226,7 +270,7 @@ export function usePetis() {
     ),
     addAppointment: useCallback(
       (a: Omit<Appointment, "id" | "completed">) =>
-        setData((d) => ({
+        mutate((d) => ({
           ...d,
           appointments: [
             ...d.appointments,
@@ -237,7 +281,7 @@ export function usePetis() {
     ),
     toggleAppointment: useCallback(
       (id: string) =>
-        setData((d) => ({
+        mutate((d) => ({
           ...d,
           appointments: d.appointments.map((a) =>
             a.id === id ? { ...a, completed: !a.completed } : a,
@@ -247,22 +291,26 @@ export function usePetis() {
     ),
     deleteAppointment: useCallback(
       (id: string) =>
-        setData((d) => ({ ...d, appointments: d.appointments.filter((a) => a.id !== id) })),
+        mutate((d) => ({ ...d, appointments: d.appointments.filter((a) => a.id !== id) })),
       [],
     ),
     addVaccine: useCallback(
       (v: Omit<Vaccine, "id">) =>
-        setData((d) => ({ ...d, vaccines: [...d.vaccines, { ...v, id: crypto.randomUUID() }] })),
+        mutate((d) => ({
+          ...d,
+          vaccines: [...d.vaccines, { ...v, id: crypto.randomUUID() }],
+        })),
       [],
     ),
     deleteVaccine: useCallback(
       (id: string) =>
-        setData((d) => ({ ...d, vaccines: d.vaccines.filter((v) => v.id !== id) })),
+        mutate((d) => ({ ...d, vaccines: d.vaccines.filter((v) => v.id !== id) })),
       [],
     ),
   };
 }
 
+/* ============ Date helpers ============ */
 export function calcAge(birthDate: string) {
   if (!birthDate) return "";
   const b = new Date(birthDate);
@@ -285,7 +333,7 @@ export function daysUntil(dateIso?: string): number | null {
   return Math.round((target.getTime() - now.getTime()) / 86400000);
 }
 
-/* ============ Auth (local, multi-user mock) ============ */
+/* ============ Auth (local, multi-user) ============ */
 export type AuthUser = {
   name: string;
   email: string;
@@ -300,44 +348,16 @@ export type LoginResult =
 
 export type RegisterResult = { ok: true } | { ok: false; reason: "exists" };
 
-const authListeners = new Set<() => void>();
-
 function readUsers(): AuthUser[] {
   if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) ?? "[]") as AuthUser[];
-  } catch {
-    return [];
-  }
+  return safeParse<AuthUser[]>(localStorage.getItem(USERS_KEY), []);
 }
 function writeUsers(u: AuthUser[]) {
   localStorage.setItem(USERS_KEY, JSON.stringify(u));
 }
-function readSession(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY) ?? "null");
-  } catch {
-    return null;
-  }
-}
-function writeSession(email: string | null) {
-  // Limpa o cache de dados do usuário anterior
-  memory = null; 
-  if (email) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(email));
-  } else {
-    localStorage.removeItem(SESSION_KEY);
-  }
-  // Notifica tanto os listeners de autenticação quanto os de dados
-  authListeners.forEach((l) => l());
-  listeners.forEach((l) => l());
-}
 
 export function getAuth(): AuthUser | null {
-  const email = readSession();
-  if (!email) return null;
-  return readUsers().find((u) => u.email.toLowerCase() === email.toLowerCase()) ?? null;
+  return readAuth();
 }
 
 export function hasRegisteredUsers(): boolean {
@@ -347,7 +367,7 @@ export function hasRegisteredUsers(): boolean {
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   useEffect(() => {
-    const sync = () => setUser(getAuth());
+    const sync = () => setUser(readAuth());
     sync();
     authListeners.add(sync);
     return () => {
@@ -362,7 +382,8 @@ export function useAuth() {
         return { ok: false, reason: "exists" };
       }
       writeUsers([...users, data]);
-      writeSession(data.email);
+      writeAuth(data);
+      notifyAuth();
       return { ok: true };
     },
     login(email: string, password: string): LoginResult {
@@ -370,35 +391,36 @@ export function useAuth() {
       const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
       if (!found) return { ok: false, reason: "no-email" };
       if (found.password !== password) return { ok: false, reason: "wrong-password" };
-      writeSession(found.email);
+      writeAuth(found);
+      notifyAuth();
       return { ok: true };
     },
     logout() {
-      writeSession(null);
+      writeAuth(null);
+      notifyAuth();
     },
     updateUser(patch: Partial<AuthUser>) {
-      const currentEmail = readSession();
-      if (!currentEmail) return;
-      
-      const oldDataKey = getDataKey(currentEmail);
-      const userData = localStorage.getItem(oldDataKey);
+      const current = readAuth();
+      if (!current) return;
+      const oldEmail = current.email;
+      const newEmail = patch.email ?? oldEmail;
 
+      // Migrate per-user data keys if email changed
+      if (newEmail.toLowerCase() !== oldEmail.toLowerCase()) {
+        const data = loadData(oldEmail);
+        saveData(newEmail, data);
+        [petsKey, tasksKey, apptsKey, vaccinesKey, activePetKey].forEach((k) =>
+          localStorage.removeItem(k(oldEmail)),
+        );
+      }
+
+      const updatedUser: AuthUser = { ...current, ...patch };
       const users = readUsers().map((u) =>
-        u.email.toLowerCase() === currentEmail.toLowerCase() ? { ...u, ...patch } : u,
+        u.email.toLowerCase() === oldEmail.toLowerCase() ? updatedUser : u,
       );
       writeUsers(users);
-
-      if (patch.email && patch.email.toLowerCase() !== currentEmail.toLowerCase()) {
-        // Migra os dados para a nova chave de usuário
-        if (userData) {
-          localStorage.setItem(getDataKey(patch.email), userData);
-          localStorage.removeItem(oldDataKey);
-        }
-        writeSession(patch.email);
-      } else {
-        authListeners.forEach((l) => l());
-        listeners.forEach((l) => l());
-      }
+      writeAuth(updatedUser);
+      notifyAuth();
     },
   };
 }
