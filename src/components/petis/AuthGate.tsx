@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useAuth, hasRegisteredUsers, maskPhone } from "@/lib/petis-storage";
+import { useLanguage } from "@/lib/i18n";
 import { PetisLogo } from "./PetisLogo";
 import { DarkModeToggle } from "./DarkModeToggle";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function AuthGate({ children }: { children: ReactNode }) {
+  useLanguage(); // re-render on language change
   const { user, login, register } = useAuth();
   const [mode, setMode] = useState<"login" | "register">(() =>
     hasRegisteredUsers() ? "login" : "register",
