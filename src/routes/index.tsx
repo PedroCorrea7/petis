@@ -16,7 +16,7 @@ import { SettingsSidebar } from "@/components/petis/SettingsSidebar";
 import { ConfirmDialog } from "@/components/petis/ConfirmDialog";
 import { usePetis, useAuth } from "@/lib/petis-storage";
 import { Skeleton } from "@/components/ui/skeleton";
-import { t } from "@/lib/i18n";
+import { t, useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/")({
   head: () => ({
